@@ -69,6 +69,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
 
     def fit(self, X, y):
         """Fitting function.
+
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -81,7 +82,6 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-
         X, y = validate_data(
             self,
             X,
@@ -107,6 +107,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
 
     def predict(self, X):
         """Predict function.
+
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
@@ -117,7 +118,6 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         y : ndarray, shape (n_test_samples,)
             Predicted class labels for each test data sample.
         """
-
         check_is_fitted(self, ["X_", "y_"])
 
         X = validate_data(
@@ -224,9 +224,11 @@ class MonthlySplit(BaseCrossValidator):
         months = pd.PeriodIndex(
             pd.Series(t).dt.to_period("M")
             ).unique().sort_values()
+        
         return max(int(len(months) - 1), 0)
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -244,7 +246,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         if not isinstance(X, (pd.DataFrame, pd.Series)):
             raise ValueError("MonthlySplit expects DataFrame or Series.")
 
