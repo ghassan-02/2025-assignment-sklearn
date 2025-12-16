@@ -226,6 +226,7 @@ class MonthlySplit(BaseCrossValidator):
             ).unique().sort_values()
         
         return max(int(len(months) - 1), 0)
+    
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
 
