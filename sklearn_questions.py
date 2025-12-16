@@ -69,7 +69,6 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
 
     def fit(self, X, y):
         """Fitting function.
-
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -108,7 +107,6 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
 
     def predict(self, X):
         """Predict function.
-
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
@@ -209,7 +207,7 @@ class MonthlySplit(BaseCrossValidator):
             The number of splits.
         """
         if not isinstance(X, (pd.DataFrame, pd.Series)):
-            raise ValueError("MonthlySplit expects a pandas DataFrame or Series.")
+            raise ValueError("MonthlySplit expects DataFrame or Series.")
 
         if self.time_col == "index":
             t = X.index
@@ -223,12 +221,12 @@ class MonthlySplit(BaseCrossValidator):
         if not pd.api.types.is_datetime64_any_dtype(t):
             raise ValueError("Time column/index must be datetime-like.")
 
-        months = pd.PeriodIndex(pd.Series(t).dt.to_period("M")).unique().sort_values()
+        months = pd.PeriodIndex(
+            pd.Series(t).dt.to_period("M")
+            ).unique().sort_values()
         return max(int(len(months) - 1), 0)
-    
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
-
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -248,7 +246,7 @@ class MonthlySplit(BaseCrossValidator):
         """
 
         if not isinstance(X, (pd.DataFrame, pd.Series)):
-            raise ValueError("MonthlySplit expects a pandas DataFrame or Series.")
+            raise ValueError("MonthlySplit expects DataFrame or Series.")
 
         if self.time_col == "index":
             t = pd.Series(X.index, index=X.index)
