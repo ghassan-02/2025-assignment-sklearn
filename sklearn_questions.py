@@ -82,6 +82,25 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+
+        X, y = validate_data(
+            self,
+            X,
+            y,
+            reset=True,
+            accept_sparse=False,
+            ensure_2d=True,
+            dtype=np.float64,
+        )
+
+        if not isinstance(self.n_neighbors, int) or self.n_neighbors <= 0:
+            raise ValueError("n_neighbors must be a positive integer.")
+        if self.n_neighbors > X.shape[0]:
+            raise ValueError("n_neighbors cannot be greater than n_samples.")
+
+        self.X_ = X
+        self.y_ = y
+
         return self
 
     def predict(self, X):
@@ -97,7 +116,27 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         y : ndarray, shape (n_test_samples,)
             Predicted class labels for each test data sample.
         """
+
+        check_is_fitted(self, attributes=["X_", "y_"])
+
+        X = validate_data(
+            self,
+            X,
+            reset=False,
+            accept_sparse=False,
+            ensure_2d=True,
+            dtype=np.float64,
+        )
+
+        distances = pairwise_distances(X, self.X_, metric="euclidean")
+        neigh_ind = np.argsort(distances, axis=1)[:, : self.n_neighbors]
+        neigh_labels = self.y_[neigh_ind]
+
         y_pred = np.zeros(X.shape[0])
+        for i in range(X.shape[0]):
+            labels, counts = np.unique(neigh_labels[i], return_counts=True)
+            y_pred[i] = labels[np.argmax(counts)]
+
         return y_pred
 
     def score(self, X, y):
@@ -115,7 +154,18 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        X, y = validate_data(
+            self,
+            X,
+            y,
+            reset=False,
+            accept_sparse=False,
+            ensure_2d=True,
+            dtype=np.float64,
+        )
+        y_pred = self.predict(X)
+
+        return float(np.mean(y_pred == y))
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -155,8 +205,23 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError("MonthlySplit expects X to be a pandas DataFrame.")
 
+        if self.time_col == "index":
+            t = X.index
+        else:
+            if self.time_col not in X.columns:
+                raise ValueError(f"time_col='{self.time_col}' not found in X.")
+            t = X[self.time_col]
+
+        if not pd.api.types.is_datetime64_any_dtype(t):
+            raise ValueError("Time column/index must be datetime-like.")
+
+        months = pd.PeriodIndex(pd.Series(t).dt.to_period("M")).unique().sort_values()
+
+        return max(int(len(months) - 1), 0)
+    
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
 
@@ -178,11 +243,30 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
 
-        n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
-        for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
-            yield (
-                idx_train, idx_test
-            )
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError("MonthlySplit expects X to be a pandas DataFrame.")
+
+        if self.time_col == "index":
+            t = pd.Series(X.index, index=X.index)
+        else:
+            if self.time_col not in X.columns:
+                raise ValueError(f"time_col='{self.time_col}' not found in X.")
+            t = pd.Series(X[self.time_col], index=X.index)
+
+        if not pd.api.types.is_datetime64_any_dtype(t):
+            raise ValueError("Time column/index must be datetime-like.")
+
+        months = t.dt.to_period("M").unique()
+        months = pd.PeriodIndex(months).sort_values()
+
+        for i in range(len(months) - 1):
+            train_month = months[i]
+            test_month = months[i + 1]
+
+            train_mask = t.dt.to_period("M") == train_month
+            test_mask = t.dt.to_period("M") == test_month
+
+            idx_train = np.flatnonzero(train_mask.to_numpy())
+            idx_test = np.flatnonzero(test_mask.to_numpy())
+
+            yield idx_train, idx_test
