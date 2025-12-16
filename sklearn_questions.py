@@ -88,19 +88,22 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
             X,
             y,
             reset=True,
-            accept_sparse=False,
             ensure_2d=True,
             dtype=np.float64,
         )
 
+        if np.issubdtype(y.dtype, np.floating) and np.unique(y).size > 20:
+            raise ValueError("Unknown label type: continuous")
+
         if not isinstance(self.n_neighbors, int) or self.n_neighbors <= 0:
             raise ValueError("n_neighbors must be a positive integer.")
-        if self.n_neighbors > X.shape[0]:
-            raise ValueError("n_neighbors cannot be greater than n_samples.")
+        n_samples = X.shape[0]
+        if self.n_neighbors > n_samples:
+            raise ValueError(f"n_samples = {n_samples}")
 
         self.X_ = X
         self.y_ = y
-
+        self.classes_ = np.unique(y)
         return self
 
     def predict(self, X):
@@ -117,13 +120,12 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
             Predicted class labels for each test data sample.
         """
 
-        check_is_fitted(self, attributes=["X_", "y_"])
+        check_is_fitted(self, ["X_", "y_"])
 
         X = validate_data(
             self,
             X,
             reset=False,
-            accept_sparse=False,
             ensure_2d=True,
             dtype=np.float64,
         )
@@ -132,7 +134,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         neigh_ind = np.argsort(distances, axis=1)[:, : self.n_neighbors]
         neigh_labels = self.y_[neigh_ind]
 
-        y_pred = np.zeros(X.shape[0])
+        y_pred = np.empty(X.shape[0], dtype=self.y_.dtype)
         for i in range(X.shape[0]):
             labels, counts = np.unique(neigh_labels[i], return_counts=True)
             y_pred[i] = labels[np.argmax(counts)]
@@ -154,25 +156,19 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
+        check_is_fitted(self, ["X_", "y_"])
+
         X, y = validate_data(
             self,
             X,
             y,
-            reset=True,
-            accept_sparse=False,
+            reset=False,
             ensure_2d=True,
             dtype=np.float64,
         )
 
-        if not isinstance(self.n_neighbors, int) or self.n_neighbors <= 0:
-            raise ValueError("n_neighbors must be a positive integer.")
-        if self.n_neighbors > X.shape[0]:
-            raise ValueError("n_neighbors cannot be greater than n_samples.")
-
-        self.X_ = X
-        self.y_ = y
-
-        return self
+        y_pred = self.predict(X)
+        return float(np.mean(y_pred == y))
 
 
 class MonthlySplit(BaseCrossValidator):
