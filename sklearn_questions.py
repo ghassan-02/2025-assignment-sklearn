@@ -158,14 +158,21 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
             self,
             X,
             y,
-            reset=False,
+            reset=True,
             accept_sparse=False,
             ensure_2d=True,
             dtype=np.float64,
         )
-        y_pred = self.predict(X)
 
-        return float(np.mean(y_pred == y))
+        if not isinstance(self.n_neighbors, int) or self.n_neighbors <= 0:
+            raise ValueError("n_neighbors must be a positive integer.")
+        if self.n_neighbors > X.shape[0]:
+            raise ValueError("n_neighbors cannot be greater than n_samples.")
+
+        self.X_ = X
+        self.y_ = y
+
+        return self
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -205,12 +212,14 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("MonthlySplit expects X to be a pandas DataFrame.")
+        if not isinstance(X, (pd.DataFrame, pd.Series)):
+            raise ValueError("MonthlySplit expects a pandas DataFrame or Series.")
 
         if self.time_col == "index":
             t = X.index
         else:
+            if isinstance(X, pd.Series):
+                raise ValueError("time_col cannot be used when X is a Series.")
             if self.time_col not in X.columns:
                 raise ValueError(f"time_col='{self.time_col}' not found in X.")
             t = X[self.time_col]
@@ -219,7 +228,6 @@ class MonthlySplit(BaseCrossValidator):
             raise ValueError("Time column/index must be datetime-like.")
 
         months = pd.PeriodIndex(pd.Series(t).dt.to_period("M")).unique().sort_values()
-
         return max(int(len(months) - 1), 0)
     
     def split(self, X, y, groups=None):
@@ -243,12 +251,14 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
 
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("MonthlySplit expects X to be a pandas DataFrame.")
+        if not isinstance(X, (pd.DataFrame, pd.Series)):
+            raise ValueError("MonthlySplit expects a pandas DataFrame or Series.")
 
         if self.time_col == "index":
             t = pd.Series(X.index, index=X.index)
         else:
+            if isinstance(X, pd.Series):
+                raise ValueError("time_col cannot be used when X is a Series.")
             if self.time_col not in X.columns:
                 raise ValueError(f"time_col='{self.time_col}' not found in X.")
             t = pd.Series(X[self.time_col], index=X.index)
@@ -256,8 +266,7 @@ class MonthlySplit(BaseCrossValidator):
         if not pd.api.types.is_datetime64_any_dtype(t):
             raise ValueError("Time column/index must be datetime-like.")
 
-        months = t.dt.to_period("M").unique()
-        months = pd.PeriodIndex(months).sort_values()
+        months = pd.PeriodIndex(t.dt.to_period("M").unique()).sort_values()
 
         for i in range(len(months) - 1):
             train_month = months[i]
